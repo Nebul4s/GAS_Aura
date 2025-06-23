@@ -45,57 +45,16 @@ void AAuraPlayerController::AutoRun()
 
 void AAuraPlayerController::CursorTrace()
 {
-	FHitResult CursorHit;
 	GetHitResultUnderCursor(ECC_Visibility, false, CursorHit);
-
 	if (!CursorHit.bBlockingHit) return;
 
 	LastActor = ThisActor;
 	ThisActor = CursorHit.GetActor();
 
-	/*
-	 * Line trace from cursor. There are several screnarios:
-	 *  A. LastActor is null && Thisactor is null
-	 *		-Do nothing
-	 *	B. LastActor is null && ThisActor is valid
-	 *		-Highlight
-	 *
-	 *	C. LastActor is valid && ThisActor is null
-	 *		-Unhighlight
-	 *	D. Both are valid, but LastActor != ThisActor
-	 *		-Unhighlight lastactor and highlight thisactor
-	 *	E. Both are valid and are the same
-	 *		-Do nothing
-	 */
-
-	if (LastActor == nullptr)
+	if (LastActor != ThisActor)
 	{
-		if (ThisActor != nullptr)
-		{
-			//Case B
-			ThisActor->HighlightActor();
-		}else
-		{
-			//Case A
-		}
-	}else
-	{
-		if (ThisActor == nullptr)
-		{
-			//Case C
-			LastActor->UnHighlightActor();
-		}else
-		{
-			if (LastActor != ThisActor)
-			{
-				//Case D
-				LastActor->UnHighlightActor();
-				ThisActor->HighlightActor();
-			}else
-			{
-				//Case E
-			}
-		}
+		if (LastActor) LastActor->UnHighlightActor();
+		if (ThisActor) ThisActor->HighlightActor();
 	}
 }
 
@@ -112,22 +71,18 @@ void AAuraPlayerController::AbilityInputTagReleased(FGameplayTag Tag)
 {
 	if (!Tag.MatchesTagExact(FAuraGameplayTags::Get().InputTag_LMB))
 	{
-		if (GetASC())
-		{
-			GetASC()->AbilityInputTagReleased(Tag);
-		}
+		if (GetASC()) GetASC()->AbilityInputTagReleased(Tag);
+		
 		return;
 	}
 
 	if (bTargeting)
 	{
-		if (GetASC())
-		{
-			GetASC()->AbilityInputTagReleased(Tag);
-		}
+		if (GetASC()) GetASC()->AbilityInputTagReleased(Tag);
+		
 	}else
 	{
-		APawn* ControlledPawn = GetPawn();
+		const APawn* ControlledPawn = GetPawn();
 		if (FollowTime <= ShortPressThreshold && ControlledPawn)
 		{
 			if (UNavigationPath* NavPath = UNavigationSystemV1::FindPathToLocationSynchronously(this, ControlledPawn->GetActorLocation(), CachedDestination))
@@ -136,7 +91,6 @@ void AAuraPlayerController::AbilityInputTagReleased(FGameplayTag Tag)
 				for (const FVector& PointLoc : NavPath->PathPoints)
 				{
 					Spline->AddSplinePoint(PointLoc, ESplineCoordinateSpace::World);
-					DrawDebugSphere(GetWorld(), PointLoc, 50, 50, FColor::Red, true, 5.f);
 				}
 				CachedDestination = NavPath->PathPoints[NavPath->PathPoints.Num() - 1];
 				bAutoRunning = true;
@@ -151,28 +105,19 @@ void AAuraPlayerController::AbilityInputTagHeld(FGameplayTag Tag)
 {
 	if (!Tag.MatchesTagExact(FAuraGameplayTags::Get().InputTag_LMB))
 	{
-		if (GetASC())
-		{
-			GetASC()->AbilityInputTagHeld(Tag);
-		}
+		if (GetASC()) GetASC()->AbilityInputTagHeld(Tag);
 		return;
 	}
 
 	if (bTargeting)
 	{
-		if (GetASC())
-		{
-			GetASC()->AbilityInputTagHeld(Tag);
-		}
+		if (GetASC()) GetASC()->AbilityInputTagHeld(Tag);
 	}else
 	{
 		FollowTime += GetWorld()->GetDeltaSeconds();
-
-		FHitResult CursorHit;
-		if (GetHitResultUnderCursor(ECC_Visibility, false, CursorHit))
-		{
-			CachedDestination = CursorHit.Location;
-		}
+		
+		if (CursorHit.bBlockingHit) CachedDestination = CursorHit.Location;
+		
 
 		if (APawn* ControlledPawn = GetPawn())
 		{
