@@ -3,6 +3,8 @@
 
 #include "AbilitySystem/Abilities/AuraProjectileSpell.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Actor/AuraProjectile.h"
 #include "Interaction/CombatInterface.h"
 
@@ -31,6 +33,9 @@ void UAuraProjectileSpell::SpawnProjectile(const FVector& ProjectileTargetLocati
 		FTransform SpawnTransform;
 		SpawnTransform.SetLocation(SocketLocation);
 		SpawnTransform.SetRotation(Rotation.Quaternion());
+
+		AActor* AvatarActor = GetAvatarActorFromActorInfo();
+		APawn* InstigatorPawn = Cast<APawn>(AvatarActor);
 		
 		AAuraProjectile* Projectile = GetWorld()->SpawnActorDeferred<AAuraProjectile>(
 			ProjectileClass,
@@ -39,7 +44,22 @@ void UAuraProjectileSpell::SpawnProjectile(const FVector& ProjectileTargetLocati
 			Cast<APawn>(GetOwningActorFromActorInfo()),
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
-		//TODO: Give the projectile a gameplay effect spec for causing damage
+		//TODO: socket location is not working as expected, dirty way to prevent immediate overlap with the casting character
+		if (Projectile)
+		{
+			Projectile->SetInstigator(InstigatorPawn);
+			Projectile->SetOwner(AvatarActor);
+
+			if (UPrimitiveComponent* CollisionComp = Cast<UPrimitiveComponent>(Projectile->GetRootComponent()))
+			{
+				CollisionComp->IgnoreActorWhenMoving(AvatarActor, true);
+				CollisionComp->MoveIgnoreActors.Add(AvatarActor);
+			}
+		}
+		
+		const UAbilitySystemComponent* SourceASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(AvatarActor);
+		const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, GetAbilityLevel(), SourceASC->MakeEffectContext());
+		Projectile->DamageEffectSpecHandle = SpecHandle;
 		
 		Projectile->FinishSpawning(SpawnTransform);
 	}
