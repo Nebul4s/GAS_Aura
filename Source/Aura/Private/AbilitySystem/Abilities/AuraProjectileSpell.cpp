@@ -7,6 +7,7 @@
 #include "AbilitySystemComponent.h"
 #include "Actor/AuraProjectile.h"
 #include "Interaction/CombatInterface.h"
+#include "Aura/Public/AuraGameplayTags.h"
 
 void UAuraProjectileSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
                                            const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
@@ -31,11 +32,10 @@ void UAuraProjectileSpell::SpawnProjectile(const FVector& ProjectileTargetLocati
 		Rotation.Pitch = 0.f;
 
 		FTransform SpawnTransform;
-		SpawnTransform.SetLocation(SocketLocation);
+		SpawnTransform.SetLocation(SocketLocation + FVector(50.f, 50.f, 0.f));
 		SpawnTransform.SetRotation(Rotation.Quaternion());
 
 		AActor* AvatarActor = GetAvatarActorFromActorInfo();
-		APawn* InstigatorPawn = Cast<APawn>(AvatarActor);
 		
 		AAuraProjectile* Projectile = GetWorld()->SpawnActorDeferred<AAuraProjectile>(
 			ProjectileClass,
@@ -43,22 +43,14 @@ void UAuraProjectileSpell::SpawnProjectile(const FVector& ProjectileTargetLocati
 			GetOwningActorFromActorInfo(),
 			Cast<APawn>(GetOwningActorFromActorInfo()),
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-
-		//TODO: socket location is not working as expected, dirty way to prevent immediate overlap with the casting character
-		if (Projectile)
-		{
-			Projectile->SetInstigator(InstigatorPawn);
-			Projectile->SetOwner(AvatarActor);
-
-			if (UPrimitiveComponent* CollisionComp = Cast<UPrimitiveComponent>(Projectile->GetRootComponent()))
-			{
-				CollisionComp->IgnoreActorWhenMoving(AvatarActor, true);
-				CollisionComp->MoveIgnoreActors.Add(AvatarActor);
-			}
-		}
 		
 		const UAbilitySystemComponent* SourceASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(AvatarActor);
 		const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, GetAbilityLevel(), SourceASC->MakeEffectContext());
+
+		FAuraGameplayTags GameplayTags = FAuraGameplayTags::Get();
+		const float ScaledDamage = Damage.GetValueAtLevel(GetAbilityLevel());
+		
+		UAbilitySystemBlueprintLibrary::AssignTagSetByCallerMagnitude(SpecHandle, GameplayTags.Damage, ScaledDamage);
 		Projectile->DamageEffectSpecHandle = SpecHandle;
 		
 		Projectile->FinishSpawning(SpawnTransform);
